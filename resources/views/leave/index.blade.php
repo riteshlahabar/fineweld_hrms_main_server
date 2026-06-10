@@ -212,6 +212,7 @@
                             <th>{{ __('Leave Date') }}</th>
                             <th>{{ __('Total Leave Taken') }}</th>
                             <th>{{ __('Total Leave Days') }}</th>
+                            <th>{{ __('Leave Balance') }}</th>
                         </tr>
                     </thead>
 
@@ -224,10 +225,11 @@
                                 <td>{{ !empty($summary->leave_dates) ? $summary->leave_dates : '-' }}</td>
                                 <td>{{ $summary->total_leave_taken }}</td>
                                 <td>{{ $summary->total_leave_days }} {{ __('days') }}</td>
+                                <td>{{ $summary->leave_balance }} {{ __('days') }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center">
+                                <td colspan="7" class="text-center">
                                     {{ __('No leave found for selected month.') }}
                                 </td>
                             </tr>

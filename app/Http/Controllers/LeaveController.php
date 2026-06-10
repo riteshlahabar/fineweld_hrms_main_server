@@ -89,6 +89,8 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
     public function getEmployeeMonthWiseLeaveSummary($month = null)
 {
     $month = $month ?? date('Y-m');
+    $creatorId = \Auth::user()->creatorId();
+    $annualCycle = Utility::AnnualLeaveCycle();
 
     $startOfMonth = date('Y-m-01', strtotime($month));
     $endOfMonth   = date('Y-m-t', strtotime($month));
@@ -101,13 +103,31 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
         $employee = Employee::where('user_id', \Auth::user()->id)->first();
         $query->where('employee_id', $employee->id);
     } else {
-        $query->where('created_by', \Auth::user()->creatorId());
+        $query->where('created_by', $creatorId);
     }
+
+    $totalAllowedLeaveDays = (float) LeaveType::where('created_by', $creatorId)->sum('days');
+
+    $approvedLeaveDays = LocalLeave::where('status', 'Approved')
+        ->whereBetween('created_at', [$annualCycle['start_date'], $annualCycle['end_date']]);
+
+    if (\Auth::user()->type == 'employee') {
+        $approvedLeaveDays->where('employee_id', $employee->id);
+    } else {
+        $approvedLeaveDays->where('created_by', $creatorId);
+    }
+
+    $approvedLeaveDays = $approvedLeaveDays
+        ->select('employee_id', \DB::raw('SUM(total_leave_days) as used_leave_days'))
+        ->groupBy('employee_id')
+        ->get()
+        ->keyBy('employee_id');
 
     return $query->get()
         ->groupBy('employee_id')
-        ->map(function ($employeeLeaves) {
+        ->map(function ($employeeLeaves) use ($approvedLeaveDays, $totalAllowedLeaveDays) {
             $leaveDates = [];
+            $employeeId = $employeeLeaves->first()->employee_id;
 
             foreach ($employeeLeaves as $leave) {
                 $leaveDates = array_merge(
@@ -116,14 +136,17 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                 );
             }
 
+            $usedLeaveDays = isset($approvedLeaveDays[$employeeId]) ? (float) $approvedLeaveDays[$employeeId]->used_leave_days : 0;
+
             $summary = new \stdClass();
-            $summary->employee_id = $employeeLeaves->first()->employee_id;
+            $summary->employee_id = $employeeId;
             $summary->employees = $employeeLeaves->first()->employees;
             $summary->total_leave_taken = $employeeLeaves->count();
             $summary->total_leave_days = $employeeLeaves->sum(function ($leave) {
                 return (float) $leave->total_leave_days;
             });
             $summary->leave_dates = implode(', ', array_values(array_unique($leaveDates)));
+            $summary->leave_balance = max($totalAllowedLeaveDays - $usedLeaveDays, 0);
 
             return $summary;
         })
