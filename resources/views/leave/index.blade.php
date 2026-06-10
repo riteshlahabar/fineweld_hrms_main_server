@@ -223,7 +223,7 @@
                                 <td>{{ date('F Y', strtotime($selectedLeaveMonth . '-01')) }}</td>
                                 <td>{{ !empty($summary->leave_dates) ? $summary->leave_dates : '-' }}</td>
                                 <td>{{ $summary->total_leave_taken }}</td>
-                                <td>{{ $summary->total_leave_days }}</td>
+                                <td>{{ $summary->total_leave_days }} {{ __('days') }}</td>
                             </tr>
                         @empty
                             <tr>
