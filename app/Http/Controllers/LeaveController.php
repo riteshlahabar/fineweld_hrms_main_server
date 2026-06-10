@@ -18,6 +18,24 @@ use Spatie\GoogleCalendar\Event as GoogleEvent;
 
 class LeaveController extends Controller
 {
+    private function normalizeDurationType(?string $durationType): string
+    {
+        return $durationType === 'half_day' ? 'half_day' : 'full_day';
+    }
+
+    private function calculateTotalLeaveDays(string $startDate, string $endDate, string $durationType): float
+    {
+        if ($durationType === 'half_day') {
+            return 0.5;
+        }
+
+        $startDate = new \DateTime($startDate);
+        $endDate = new \DateTime($endDate);
+        $endDate->add(new \DateInterval('P1D'));
+
+        return !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+    }
+
     public function index()
     {
 
@@ -107,6 +125,8 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                     'leave_type_id' => 'required',
                     'start_date' => 'required',
                     'end_date' => 'required|after_or_equal:start_date',
+                    'duration_type' => 'required|in:full_day,half_day',
+                    'half_day_type' => 'nullable|required_if:duration_type,half_day|in:first_half,second_half',
                     'leave_reason' => 'required',
                     'remark' => 'required',
                 ]
@@ -119,11 +139,13 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
 
             // $employee = Employee::where('created_by', '=', \Auth::user()->id)->first();
             $leave_type = LeaveType::find($request->leave_type_id);
+            $durationType = $this->normalizeDurationType($request->duration_type);
+            $halfDayType = $durationType === 'half_day' ? $request->half_day_type : null;
 
-            $startDate = new \DateTime($request->start_date);
-            $endDate = new \DateTime($request->end_date);
-            $endDate->add(new \DateInterval('P1D'));
-            // $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+            if ($durationType === 'half_day' && $request->start_date !== $request->end_date) {
+                return redirect()->back()->with('error', __('Half day leave must have the same start date and end date.'));
+            }
+
             $date = Utility::AnnualLeaveCycle();
 
             if (\Auth::user()->type == 'employee') {
@@ -138,7 +160,7 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                 $leaves_pending  = LocalLeave::where('employee_id', '=', $request->employee_id)->where('leave_type_id', $leave_type->id)->where('status', 'Pending')->whereBetween('created_at', [$date['start_date'], $date['end_date']])->sum('total_leave_days');
             }
 
-            $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+            $total_leave_days = $this->calculateTotalLeaveDays($request->start_date, $request->end_date, $durationType);
 
             $return = $leave_type->days - $leaves_used;
             if ($total_leave_days > $return) {
@@ -161,6 +183,8 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                 $leave->applied_on       = date('Y-m-d');
                 $leave->start_date       = $request->start_date;
                 $leave->end_date         = $request->end_date;
+                $leave->duration_type    = $durationType;
+                $leave->half_day_type    = $halfDayType;
                 $leave->total_leave_days = $total_leave_days;
                 $leave->leave_reason     = $request->leave_reason;
                 $leave->remark           = $request->remark;
@@ -215,7 +239,7 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
             if ($leave->created_by == \Auth::user()->creatorId()) {
 
                 if (Auth::user()->type == 'employee') {
-                    $employees = Employee::where('employee_id', '=', \Auth::user()->creatorId())->first();
+                    $employees = Employee::where('user_id', '=', \Auth::user()->id)->first();
                 } else {
                     $employees = Employee::where('created_by', '=', \Auth::user()->creatorId())->get()->pluck('name', 'id');
                 }
@@ -242,26 +266,30 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                 $validator = \Validator::make(
                     $request->all(),
                     [
-                        'employee_id' => 'required',
-                        'leave_type_id' => 'required',
-                        'start_date' => 'required',
-                        'end_date' => 'required|after_or_equal:start_date',
-                        'leave_reason' => 'required',
-                        'remark' => 'required',
-                    ]
-                );
+                    'employee_id' => 'required',
+                    'leave_type_id' => 'required',
+                    'start_date' => 'required',
+                    'end_date' => 'required|after_or_equal:start_date',
+                    'duration_type' => 'required|in:full_day,half_day',
+                    'half_day_type' => 'nullable|required_if:duration_type,half_day|in:first_half,second_half',
+                    'leave_reason' => 'required',
+                    'remark' => 'required',
+                ]
+            );
                 if ($validator->fails()) {
                     $messages = $validator->getMessageBag();
 
                     return redirect()->back()->with('error', $messages->first());
                 }
                 $leave_type = LeaveType::find($request->leave_type_id);
-                $employee = Employee::where('employee_id', '=', \Auth::user()->creatorId())->first();
+                $employee = Employee::where('user_id', '=', \Auth::user()->id)->first();
+                $durationType = $this->normalizeDurationType($request->duration_type);
+                $halfDayType = $durationType === 'half_day' ? $request->half_day_type : null;
 
-                $startDate = new \DateTime($request->start_date);
-                $endDate = new \DateTime($request->end_date);
-                $endDate->add(new \DateInterval('P1D'));
-                // $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+                if ($durationType === 'half_day' && $request->start_date !== $request->end_date) {
+                    return redirect()->back()->with('error', __('Half day leave must have the same start date and end date.'));
+                }
+
                 $date = Utility::AnnualLeaveCycle();
 
                 if (\Auth::user()->type == 'employee') {
@@ -276,7 +304,7 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                     $leaves_pending  = LocalLeave::whereNotIn('id', [$leave->id])->where('employee_id', '=', $request->employee_id)->where('leave_type_id', $leave_type->id)->where('status', 'Pending')->whereBetween('created_at', [$date['start_date'], $date['end_date']])->sum('total_leave_days');
                 }
 
-                $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+                $total_leave_days = $this->calculateTotalLeaveDays($request->start_date, $request->end_date, $durationType);
 
                 $return = $leave_type->days - $leaves_used;
                 if ($total_leave_days > $return) {
@@ -296,6 +324,8 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
                     $leave->leave_type_id    = $request->leave_type_id;
                     $leave->start_date       = $request->start_date;
                     $leave->end_date         = $request->end_date;
+                    $leave->duration_type    = $durationType;
+                    $leave->half_day_type    = $halfDayType;
                     $leave->total_leave_days = $total_leave_days;
                     $leave->leave_reason     = $request->leave_reason;
                     $leave->remark           = $request->remark;
@@ -355,11 +385,11 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
 
         $leave->status = $request->status;
         if ($leave->status == 'Approved') {
-            $startDate               = new \DateTime($leave->start_date);
-            $endDate                 = new \DateTime($leave->end_date);
-            $endDate->add(new \DateInterval('P1D'));
-            // $total_leave_days        = $startDate->diff($endDate)->days;
-            $total_leave_days        = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+            $total_leave_days        = $this->calculateTotalLeaveDays(
+                $leave->start_date,
+                $leave->end_date,
+                $this->normalizeDurationType($leave->duration_type)
+            );
             $leave->total_leave_days = $total_leave_days;
             $leave->status           = 'Approved';
         }

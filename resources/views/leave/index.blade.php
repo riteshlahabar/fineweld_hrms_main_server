@@ -48,6 +48,7 @@
                                     <th>{{ __('Applied On') }}</th>
                                     <th>{{ __('Start Date') }}</th>
                                     <th>{{ __('End Date') }}</th>
+                                    <th>{{ __('Leave Duration') }}</th>
                                     <th>{{ __('Total Days') }}</th>
                                     <th>{{ __('Leave Reason') }}</th>
                                     <th>{{ __('status') }}</th>
@@ -66,8 +67,9 @@
                                         <td>{{ \Auth::user()->dateFormat($leave->applied_on) }}</td>
                                         <td>{{ \Auth::user()->dateFormat($leave->start_date) }}</td>
                                         <td>{{ \Auth::user()->dateFormat($leave->end_date) }}</td>
+                                        <td>{{ $leave->leave_duration_label }}</td>
 
-                                        <td>{{ $leave->total_leave_days }}</td>
+                                        <td>{{ $leave->formatted_total_leave_days }}</td>
                                         <td>{{ $leave->leave_reason }}</td>
                                         <td>
                                             @if ($leave->status == 'Pending')

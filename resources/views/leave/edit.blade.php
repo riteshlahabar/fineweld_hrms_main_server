@@ -32,9 +32,9 @@
             <div class="form-group">
                 {{ Form::label('leave_type_id', __('Leave Type'), ['class' => 'col-form-label']) }}<x-required></x-required>
                 <select name="leave_type_id" id="leave_type_id" class="form-control select" required>
-                    @foreach ($leavetypes as $leave)
-                        <option value="{{ $leave->id }}">{{ $leave->title }} (<p class="float-right pr-5">
-                                {{ $leave->days }}</p>)</option>
+                    @foreach ($leavetypes as $leaveType)
+                        <option value="{{ $leaveType->id }}" @selected(old('leave_type_id', $leave->leave_type_id) == $leaveType->id)>{{ $leaveType->title }} (<p class="float-right pr-5">
+                                {{ $leaveType->days }}</p>)</option>
                     @endforeach
                 </select>
             </div>
@@ -43,14 +43,38 @@
     <div class="row">
         <div class="col-md-6">
             <div class="form-group">
+                {{ Form::label('duration_type', __('Leave Duration'), ['class' => 'col-form-label']) }}<x-required></x-required>
+                <select name="duration_type" id="duration_type" class="form-control" required>
+                    <option value="full_day" @selected(old('duration_type', $leave->duration_type ?? 'full_day') == 'full_day')>{{ __('Full Day') }}</option>
+                    <option value="half_day" @selected(old('duration_type', $leave->duration_type) == 'half_day')>{{ __('Half Day') }}</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6" id="half_day_type_wrapper" style="display: none;">
+            <div class="form-group">
+                {{ Form::label('half_day_type', __('Half Day Session'), ['class' => 'col-form-label']) }}<x-required></x-required>
+                <select name="half_day_type" id="half_day_type" class="form-control">
+                    <option value="">{{ __('Select Half Day Session') }}</option>
+                    <option value="first_half" @selected(old('half_day_type', $leave->half_day_type) == 'first_half')>{{ __('First Half') }}</option>
+                    <option value="second_half" @selected(old('half_day_type', $leave->half_day_type) == 'second_half')>{{ __('Second Half') }}</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
                 {{ Form::label('start_date', __('Start Date'), ['class' => 'col-form-label']) }}<x-required></x-required>
-                {{ Form::text('start_date', null, ['class' => 'form-control d_week', 'required' => 'required', 'autocomplete' => 'off']) }}
+                {{ Form::text('start_date', null, ['class' => 'form-control d_week', 'id' => 'start_date', 'required' => 'required', 'autocomplete' => 'off']) }}
             </div>
         </div>
         <div class="col-md-6">
             <div class="form-group">
                 {{ Form::label('end_date', __('End Date'), ['class' => 'col-form-label']) }}<x-required></x-required>
-                {{ Form::text('end_date', null, ['class' => 'form-control d_week', 'required' => 'required', 'autocomplete' => 'off']) }}
+                {{ Form::text('end_date', null, ['class' => 'form-control d_week', 'id' => 'end_date', 'required' => 'required', 'autocomplete' => 'off']) }}
+                <small class="text-muted" id="half_day_note" style="display: none;">
+                    {{ __('For half day leave, end date will match start date automatically.') }}
+                </small>
             </div>
         </div>
     </div>
@@ -114,5 +138,25 @@
                 $('#employee_id').trigger('change');
             }
         }, 100);
+
+        function toggleHalfDayFields() {
+            var isHalfDay = $('#duration_type').val() === 'half_day';
+
+            $('#half_day_type_wrapper').toggle(isHalfDay);
+            $('#half_day_note').toggle(isHalfDay);
+            $('#end_date').prop('readonly', isHalfDay);
+
+            if (isHalfDay) {
+                $('#end_date').val($('#start_date').val());
+            } else {
+                $('#half_day_type').val('');
+            }
+        }
+
+        $('#duration_type, #start_date').on('change', function() {
+            toggleHalfDayFields();
+        });
+
+        toggleHalfDayFields();
     });
 </script>

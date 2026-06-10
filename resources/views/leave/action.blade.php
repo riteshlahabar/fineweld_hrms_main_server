@@ -24,6 +24,14 @@
                     <td>{{ \Auth::user()->dateFormat($leave->end_date) }}</td>
                 </tr>
                 <tr>
+                    <th>{{ __('Leave Duration') }}</th>
+                    <td>{{ $leave->leave_duration_label }}</td>
+                </tr>
+                <tr>
+                    <th>{{ __('Total Days') }}</th>
+                    <td>{{ $leave->formatted_total_leave_days }}</td>
+                </tr>
+                <tr>
                     <th>{{ __('Leave Reason') }}</th>
                     <td>{{ !empty($leave->leave_reason) ? $leave->leave_reason : '' }}</td>
                 </tr>
