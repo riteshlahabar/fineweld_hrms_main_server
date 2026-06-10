@@ -36,6 +36,20 @@ class LeaveController extends Controller
         return !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
     }
 
+    private function getExpandedLeaveDates(string $startDate, string $endDate): array
+    {
+        $dates = [];
+        $currentDate = new \DateTime($startDate);
+        $lastDate = new \DateTime($endDate);
+
+        while ($currentDate <= $lastDate) {
+            $dates[] = $currentDate->format('d/m/Y');
+            $currentDate->modify('+1 day');
+        }
+
+        return $dates;
+    }
+
     public function index()
     {
 
@@ -79,14 +93,9 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
     $startOfMonth = date('Y-m-01', strtotime($month));
     $endOfMonth   = date('Y-m-t', strtotime($month));
 
-    $query = LocalLeave::select(
-            'employee_id',
-            \DB::raw('COUNT(*) as total_leave_taken'),
-            \DB::raw('SUM(total_leave_days) as total_leave_days')
-        )
+    $query = LocalLeave::with('employees:id,name')
         ->whereBetween('start_date', [$startOfMonth, $endOfMonth])
-        ->groupBy('employee_id')
-        ->with('employees:id,name');
+        ->orderBy('start_date');
 
     if (\Auth::user()->type == 'employee') {
         $employee = Employee::where('user_id', \Auth::user()->id)->first();
@@ -95,7 +104,30 @@ $employeeMonthWiseLeaves = $this->getEmployeeMonthWiseLeaveSummary($selectedLeav
         $query->where('created_by', \Auth::user()->creatorId());
     }
 
-    return $query->get();
+    return $query->get()
+        ->groupBy('employee_id')
+        ->map(function ($employeeLeaves) {
+            $leaveDates = [];
+
+            foreach ($employeeLeaves as $leave) {
+                $leaveDates = array_merge(
+                    $leaveDates,
+                    $this->getExpandedLeaveDates($leave->start_date, $leave->end_date)
+                );
+            }
+
+            $summary = new \stdClass();
+            $summary->employee_id = $employeeLeaves->first()->employee_id;
+            $summary->employees = $employeeLeaves->first()->employees;
+            $summary->total_leave_taken = $employeeLeaves->count();
+            $summary->total_leave_days = $employeeLeaves->sum(function ($leave) {
+                return (float) $leave->total_leave_days;
+            });
+            $summary->leave_dates = implode(', ', array_values(array_unique($leaveDates)));
+
+            return $summary;
+        })
+        ->values();
 }
 
     public function create()

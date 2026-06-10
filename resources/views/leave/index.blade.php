@@ -209,6 +209,7 @@
                             <th>{{ __('Sr. No.') }}</th>
                             <th>{{ __('Employee') }}</th>
                             <th>{{ __('Month') }}</th>
+                            <th>{{ __('Leave Date') }}</th>
                             <th>{{ __('Total Leave Taken') }}</th>
                             <th>{{ __('Total Leave Days') }}</th>
                         </tr>
@@ -220,12 +221,13 @@
                                 <td>{{ $key + 1 }}</td>
                                 <td>{{ !empty($summary->employees) ? $summary->employees->name : '-' }}</td>
                                 <td>{{ date('F Y', strtotime($selectedLeaveMonth . '-01')) }}</td>
+                                <td>{{ !empty($summary->leave_dates) ? $summary->leave_dates : '-' }}</td>
                                 <td>{{ $summary->total_leave_taken }}</td>
                                 <td>{{ $summary->total_leave_days }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center">
+                                <td colspan="6" class="text-center">
                                     {{ __('No leave found for selected month.') }}
                                 </td>
                             </tr>
